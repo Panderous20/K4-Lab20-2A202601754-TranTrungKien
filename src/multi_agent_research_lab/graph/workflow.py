@@ -18,6 +18,7 @@ from multi_agent_research_lab.agents.supervisor import (
 )
 from multi_agent_research_lab.agents.writer import WriterAgent
 from multi_agent_research_lab.core.state import ResearchState
+from multi_agent_research_lab.observability.tracing import trace_span
 
 logger = logging.getLogger(__name__)
 
@@ -58,24 +59,38 @@ class MultiAgentWorkflow:
         writer = WriterAgent()
 
         def _supervisor_node(data: dict[str, Any]) -> dict[str, Any]:
-            state = _dict_to_state(data)
-            state = supervisor.run(state)
-            return _state_to_dict(state)
+            with trace_span("supervisor", {"iteration": data.get("iteration", 0)}) as span:
+                state = _dict_to_state(data)
+                state = supervisor.run(state)
+                span["next_route"] = state.route_history[-1] if state.route_history else None
+                return _state_to_dict(state)
 
         def _researcher_node(data: dict[str, Any]) -> dict[str, Any]:
-            state = _dict_to_state(data)
-            state = researcher.run(state)
-            return _state_to_dict(state)
+            req = data.get("request") or {}
+            query = req.get("query") if isinstance(req, dict) else getattr(req, "query", "")
+            with trace_span("researcher", {"query": query}) as span:
+                state = _dict_to_state(data)
+                state = researcher.run(state)
+                span["notes_length"] = len(state.research_notes or "")
+                return _state_to_dict(state)
 
         def _analyst_node(data: dict[str, Any]) -> dict[str, Any]:
-            state = _dict_to_state(data)
-            state = analyst.run(state)
-            return _state_to_dict(state)
+            with trace_span(
+                "analyst", {"notes_length": len(data.get("research_notes") or "")}
+            ) as span:
+                state = _dict_to_state(data)
+                state = analyst.run(state)
+                span["analysis_length"] = len(state.analysis_notes or "")
+                return _state_to_dict(state)
 
         def _writer_node(data: dict[str, Any]) -> dict[str, Any]:
-            state = _dict_to_state(data)
-            state = writer.run(state)
-            return _state_to_dict(state)
+            with trace_span(
+                "writer", {"analysis_length": len(data.get("analysis_notes") or "")}
+            ) as span:
+                state = _dict_to_state(data)
+                state = writer.run(state)
+                span["answer_length"] = len(state.final_answer or "")
+                return _state_to_dict(state)
 
         # ── Conditional router ─────────────────────────────────────────────
         def _route_decision(data: dict[str, Any]) -> str:
@@ -127,13 +142,16 @@ class MultiAgentWorkflow:
         compiled = self.build()
         logger.info("MultiAgentWorkflow: starting run for query=%r", state.request.query)
 
-        result_dict: dict[str, Any] = compiled.invoke(_state_to_dict(state))
+        with trace_span("multi_agent_workflow", {"query": state.request.query}) as span:
+            result_dict: dict[str, Any] = compiled.invoke(_state_to_dict(state))
+            final_state = _dict_to_state(result_dict)
+            span["iterations"] = final_state.iteration
+            span["route_history"] = final_state.route_history
+            span["has_answer"] = bool(final_state.final_answer)
 
-        final_state = _dict_to_state(result_dict)
         logger.info(
             "MultiAgentWorkflow: finished  route_history=%s  iterations=%d",
             final_state.route_history,
             final_state.iteration,
         )
         return final_state
-

@@ -8,7 +8,7 @@ Public API:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from multi_agent_research_lab.core.schemas import BenchmarkMetrics
@@ -27,7 +27,7 @@ def render_markdown_report(metrics: list[BenchmarkMetrics]) -> str:
     3. Trade-off analysis narrative
     4. Failure mode paragraph
     """
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     lines: list[str] = [
         "# Benchmark Report",
@@ -54,10 +54,16 @@ def render_markdown_report(metrics: list[BenchmarkMetrics]) -> str:
     lines += ["", "## Per-Metric Analysis", ""]
 
     def _winner(attr: str, lower_is_better: bool = False) -> str:
-        candidates = [(m.run_name, getattr(m, attr)) for m in metrics if getattr(m, attr) is not None]
+        candidates = [
+            (m.run_name, getattr(m, attr)) for m in metrics if getattr(m, attr) is not None
+        ]
         if not candidates:
             return "—"
-        best = min(candidates, key=lambda x: x[1]) if lower_is_better else max(candidates, key=lambda x: x[1])
+        best = (
+            min(candidates, key=lambda x: x[1])
+            if lower_is_better
+            else max(candidates, key=lambda x: x[1])
+        )
         return best[0]
 
     lines += [
@@ -65,7 +71,10 @@ def render_markdown_report(metrics: list[BenchmarkMetrics]) -> str:
         f"- **Cheapest** (lowest cost): `{_winner('estimated_cost_usd', lower_is_better=True)}`",
         f"- **Highest quality**: `{_winner('quality_score')}`",
         f"- **Best citation coverage**: `{_winner('citation_coverage')}`",
-        f"- **Most reliable** (lowest failure rate): `{_winner('failure_rate', lower_is_better=True)}`",
+        (
+            "- **Most reliable** (lowest failure rate): "
+            f"`{_winner('failure_rate', lower_is_better=True)}`"
+        ),
     ]
 
     # ── Trade-off narrative ───────────────────────────────────────────────────
@@ -101,15 +110,24 @@ def render_markdown_report(metrics: list[BenchmarkMetrics]) -> str:
         "(Tavily / Bing) to ground sources in live URLs.",
         "2. **Latency spikes** — sequential LLM calls add up; a 60 s timeout can be hit on slow "
         "models or rate-limited keys. Mitigation: parallelise researcher sub-tasks or add caching.",
-        "3. **Token budget overflow** — passing full `research_notes` into the analyst prompt risks "
-        "exceeding context limits for very long queries. Mitigation: truncate or chunk notes before "
-        "passing downstream.",
+        "3. **Token budget overflow** — passing full `research_notes` into the analyst prompt "
+        "risks exceeding context limits for very long queries. Mitigation: truncate or chunk notes "
+        "before passing downstream.",
         "4. **Routing loop** — if an agent fails to populate its expected field (e.g., "
-        "`analysis_notes`), the supervisor will keep re-routing to analyst until `max_iterations`. "
-        "Mitigation: add an `errors` check in the routing policy and emit `done` on repeated failure.",
+        "`analysis_notes`), the supervisor will keep re-routing to analyst until "
+        "`max_iterations`. Mitigation: add an `errors` check in the routing policy and emit "
+        "`done` on repeated failure.",
+        "",
+        "## Trace Evidence",
+        "",
+        "- **LangSmith Project**: `multi-agent-research-lab`",
+        "- **Local Traces**: `reports/traces/`",
+        "",
+        "![LangSmith Trace](Langsmith_evidence.png)",
         "",
         "---",
-        "_Report produced by `evaluation/report.py`. Re-run with `python scripts/run_benchmark.py`._",
+        "_Report produced by `evaluation/report.py`. "
+        "Re-run with `python scripts/run_benchmark.py`._",
     ]
 
     return "\n".join(lines) + "\n"
@@ -122,4 +140,3 @@ def save_report(metrics: list[BenchmarkMetrics], path: Path = _REPORT_PATH) -> P
     path.write_text(content, encoding="utf-8")
     logger.info("Benchmark report written to %s (%d bytes)", path, len(content))
     return path
-

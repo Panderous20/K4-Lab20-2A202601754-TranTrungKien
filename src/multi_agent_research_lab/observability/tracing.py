@@ -19,10 +19,12 @@ import logging
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+
+from multi_agent_research_lab.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +38,19 @@ def _get_langsmith_client() -> Any:
     if _ls_client is not None:
         return _ls_client
 
-    api_key = os.getenv("LANGSMITH_API_KEY", "")
+    settings = get_settings()
+    api_key = settings.langsmith_api_key or os.getenv("LANGSMITH_API_KEY", "")
     if not api_key:
         return None
 
     try:
         from langsmith import Client  # type: ignore[import]
 
+        project = settings.langsmith_project or os.getenv(
+            "LANGSMITH_PROJECT", "multi-agent-research-lab"
+        )
         _ls_client = Client(api_key=api_key)
-        logger.info("Tracing: LangSmith client initialised (project=%s)", os.getenv("LANGSMITH_PROJECT"))
+        logger.info("Tracing: LangSmith client initialised (project=%s)", project)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Tracing: LangSmith unavailable — %s", exc)
         _ls_client = None
@@ -60,7 +66,7 @@ def _write_local_trace(span: dict[str, Any]) -> None:
     """Append span JSON to a daily trace file for offline inspection."""
     try:
         _TRACE_DIR.mkdir(parents=True, exist_ok=True)
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         trace_file = _TRACE_DIR / f"trace_{date_str}.jsonl"
         with trace_file.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(span) + "\n")
@@ -83,7 +89,7 @@ def trace_span(name: str, attributes: dict[str, Any] | None = None) -> Iterator[
     """
     attrs = attributes or {}
     started = perf_counter()
-    ts_start = datetime.now(timezone.utc).isoformat()
+    ts_start = datetime.now(UTC).isoformat()
 
     span: dict[str, Any] = {
         "name": name,
@@ -126,12 +132,14 @@ def trace_span(name: str, attributes: dict[str, Any] | None = None) -> Iterator[
         # ── LangSmith: end run ────────────────────────────────────────────
         if ls_client is not None and ls_run_id is not None:
             try:
-                outputs = {k: v for k, v in span.items() if k not in ("name", "attributes", "started_at")}
+                outputs = {
+                    k: v for k, v in span.items() if k not in ("name", "attributes", "started_at")
+                }
                 ls_client.update_run(
                     ls_run_id,
                     outputs=outputs,
                     error=str(error) if error else None,
-                    end_time=datetime.now(timezone.utc),
+                    end_time=datetime.now(UTC),
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Tracing: LangSmith update_run failed — %s", exc)
@@ -140,4 +148,3 @@ def trace_span(name: str, attributes: dict[str, Any] | None = None) -> Iterator[
         _write_local_trace(span)
 
         logger.debug("trace_span '%s' finished in %.3fs", name, duration)
-

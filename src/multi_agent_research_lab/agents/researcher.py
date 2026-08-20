@@ -52,10 +52,12 @@ class ResearcherAgent(BaseAgent):
             AgentResult(
                 agent=AgentName.RESEARCHER,
                 content=response.content,
-                metadata={"input_tokens": response.input_tokens, "output_tokens": response.output_tokens},
+                metadata={
+                    "input_tokens": response.input_tokens,
+                    "output_tokens": response.output_tokens,
+                },
             )
         )
         state.add_trace_event("researcher_done", {"notes_length": len(response.content)})
         logger.info("ResearcherAgent: done, notes=%d chars", len(response.content))
         return state
-

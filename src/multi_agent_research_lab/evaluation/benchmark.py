@@ -26,6 +26,7 @@ Runner = Callable[[str], ResearchState]
 
 # ── Metric helpers ─────────────────────────────────────────────────────────────
 
+
 def _estimate_total_cost(state: ResearchState) -> float | None:
     """Sum cost_usd from sources metadata (set by each agent via LLMClient)."""
     total = 0.0
@@ -37,7 +38,7 @@ def _estimate_total_cost(state: ResearchState) -> float | None:
             found = True
     # Also scan agent_results for any token counts not captured in sources
     # (analyst / writer don't write to sources)
-    PRICE_PER_1K_IN = 0.000150   # gpt-4o-mini defaults
+    PRICE_PER_1K_IN = 0.000150  # gpt-4o-mini defaults
     PRICE_PER_1K_OUT = 0.000600
     for ar in state.agent_results:
         in_tok = ar.metadata.get("input_tokens")
@@ -100,6 +101,7 @@ def _citation_coverage(state: ResearchState) -> float:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
+
 def run_benchmark(
     run_name: str, query: str, runner: Runner
 ) -> tuple[ResearchState, BenchmarkMetrics]:
@@ -130,7 +132,11 @@ def run_benchmark(
     )
     logger.info(
         "Benchmark '%s': latency=%.2fs cost=$%s quality=%.1f citation=%.0f%%",
-        run_name, latency, f"{cost:.5f}" if cost else "N/A", quality, (citation or 0) * 100,
+        run_name,
+        latency,
+        f"{cost:.5f}" if cost else "N/A",
+        quality,
+        (citation or 0) * 100,
     )
     return state, metrics
 
@@ -177,4 +183,3 @@ def run_benchmark_suite(
         failure_rate=failure_rate,
         notes=f"n={n} failures={failures}",
     )
-

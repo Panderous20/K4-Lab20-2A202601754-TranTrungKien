@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 
 import openai
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from multi_agent_research_lab.core.config import get_settings
 from multi_agent_research_lab.core.errors import AgentExecutionError
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 # ── Approximate pricing per 1 K tokens (USD) ── gpt-4o-mini as default ──
 _PRICING: dict[str, tuple[float, float]] = {
-    "gpt-4o-mini":       (0.000150, 0.000600),   # (input, output) per 1K tok
-    "gpt-4o":            (0.002500, 0.010000),
-    "gpt-4-turbo":       (0.010000, 0.030000),
-    "gpt-3.5-turbo":     (0.000500, 0.001500),
+    "gpt-4o-mini": (0.000150, 0.000600),  # (input, output) per 1K tok
+    "gpt-4o": (0.002500, 0.010000),
+    "gpt-4-turbo": (0.010000, 0.030000),
+    "gpt-3.5-turbo": (0.000500, 0.001500),
 }
 
 
@@ -48,9 +48,7 @@ class LLMClient:
         settings = get_settings()
 
         if not settings.openai_api_key:
-            raise AgentExecutionError(
-                "OPENAI_API_KEY is not set. Add it to your .env file."
-            )
+            raise AgentExecutionError("OPENAI_API_KEY is not set. Add it to your .env file.")
 
         self._model = settings.openai_model
         self._timeout = settings.timeout_seconds

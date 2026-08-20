@@ -45,6 +45,7 @@ def baseline(
 
     import time
 
+    from multi_agent_research_lab.observability.tracing import trace_span
     from multi_agent_research_lab.services.llm_client import LLMClient
 
     _init()
@@ -57,12 +58,17 @@ def baseline(
 
     client = LLMClient()
 
-    start = time.perf_counter()
-    response = client.complete(system_prompt=system_prompt, user_prompt=request.query)
-    latency = time.perf_counter() - start
+    with trace_span("baseline", {"query": request.query}) as span:
+        start = time.perf_counter()
+        response = client.complete(system_prompt=system_prompt, user_prompt=request.query)
+        latency = time.perf_counter() - start
 
-    state = ResearchState(request=request)
-    state.final_answer = response.content
+        state = ResearchState(request=request)
+        state.final_answer = response.content
+        span["input_tokens"] = response.input_tokens
+        span["output_tokens"] = response.output_tokens
+        span["cost_usd"] = response.cost_usd
+        span["latency_seconds"] = latency
 
     # ── Display answer ──────────────────────────────────────────────
     console.print(Panel.fit(state.final_answer, title="Single-Agent Baseline"))

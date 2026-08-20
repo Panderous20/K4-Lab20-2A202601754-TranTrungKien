@@ -63,4 +63,3 @@ class SupervisorAgent(BaseAgent):
 
         state.record_route(next_route)
         return state
-

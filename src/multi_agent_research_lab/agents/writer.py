@@ -30,9 +30,11 @@ class WriterAgent(BaseAgent):
             "- End with a 'Conclusion' paragraph.\n"
             "Audience: technical learners. Format: markdown."
         )
-        sources_text = "\n".join(
-            f"- {s.title}: {s.snippet}" for s in state.sources
-        ) if state.sources else "No external sources."
+        sources_text = (
+            "\n".join(f"- {s.title}: {s.snippet}" for s in state.sources)
+            if state.sources
+            else "No external sources."
+        )
 
         response = client.complete(
             system_prompt=system_prompt,
@@ -49,10 +51,12 @@ class WriterAgent(BaseAgent):
             AgentResult(
                 agent=AgentName.WRITER,
                 content=response.content,
-                metadata={"input_tokens": response.input_tokens, "output_tokens": response.output_tokens},
+                metadata={
+                    "input_tokens": response.input_tokens,
+                    "output_tokens": response.output_tokens,
+                },
             )
         )
         state.add_trace_event("writer_done", {"answer_length": len(response.content)})
         logger.info("WriterAgent: done, final_answer=%d chars", len(response.content))
         return state
-

@@ -18,7 +18,9 @@ class AnalystAgent(BaseAgent):
     def run(self, state: ResearchState) -> ResearchState:
         """Populate `state.analysis_notes` from research_notes via LLM."""
 
-        logger.info("AnalystAgent: analysing %d chars of research notes", len(state.research_notes or ""))
+        logger.info(
+            "AnalystAgent: analysing %d chars of research notes", len(state.research_notes or "")
+        )
 
         client = LLMClient()
         system_prompt = (
@@ -32,8 +34,7 @@ class AnalystAgent(BaseAgent):
         response = client.complete(
             system_prompt=system_prompt,
             user_prompt=(
-                f"Original query: {state.request.query}\n\n"
-                f"Research notes:\n{state.research_notes}"
+                f"Original query: {state.request.query}\n\nResearch notes:\n{state.research_notes}"
             ),
         )
 
@@ -42,10 +43,12 @@ class AnalystAgent(BaseAgent):
             AgentResult(
                 agent=AgentName.ANALYST,
                 content=response.content,
-                metadata={"input_tokens": response.input_tokens, "output_tokens": response.output_tokens},
+                metadata={
+                    "input_tokens": response.input_tokens,
+                    "output_tokens": response.output_tokens,
+                },
             )
         )
         state.add_trace_event("analyst_done", {"analysis_length": len(response.content)})
         logger.info("AnalystAgent: done, analysis=%d chars", len(response.content))
         return state
-
