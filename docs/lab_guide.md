@@ -115,3 +115,34 @@ Mỗi nhóm trả lời 2 câu:
 
 1. Case nào nên dùng multi-agent? Vì sao?
 2. Case nào không nên dùng multi-agent? Vì sao?
+
+---
+
+### Câu trả lời — Tran Trung Kien (2A202601754)
+
+> Dựa trên số liệu benchmark thực tế: model `gpt-4o-mini`, 2 queries, đo ngày 2026-08-20.
+> Xem chi tiết tại `reports/benchmark_report.md`.
+
+#### 1. NÊN dùng multi-agent khi:
+
+| Điều kiện | Lý do cụ thể | Bằng chứng từ benchmark |
+|---|---|---|
+| Task có **nhiều bước độc lập** (research → analyse → write) | Mỗi agent có system prompt chuyên biệt → output tốt hơn rõ rệt | Quality tăng từ 7.0 → 10.0 / 10 (+43%) |
+| Cần **traceability và auditability** | `route_history`, `agent_results`, trace JSONL cho phép debug từng bước | Trace ghi rõ `iter=0..3`, từng agent, từng token |
+| Output cần **cấu trúc rõ ràng** với citations | Writer có đủ context từ Researcher + Analyst để viết report đầy đủ section + references | `final_answer` 3700+ chars với inline citations |
+| Latency **không phải constraint cứng** (> 20s chấp nhận được) | 3 LLM calls tuần tự không thể dưới 15s với gpt-4o-mini | Multi-agent: 20.35s avg |
+
+**Tóm lại:** Dùng multi-agent khi bạn cần **chất lượng cao + khả năng debug** và chấp nhận đánh đổi latency và cost.
+
+---
+
+#### 2. KHÔNG NÊN dùng multi-agent khi:
+
+| Điều kiện | Lý do cụ thể | Bằng chứng từ benchmark |
+|---|---|---|
+| **Câu hỏi đơn giản**, one-shot | 1 LLM call đủ; thêm agents chỉ tăng overhead mà không tăng chất lượng | Baseline 7.57s đủ cho factual QA |
+| **Latency là constraint cứng** (real-time chat, autocomplete) | Multi-agent chậm hơn 2.7× (7.57s → 20.35s) | Không đạt SLA < 10s |
+| **Budget token hạn chế** | Multi-agent tốn 4.4× chi phí | $0.00031 vs $0.00137 — tại 1M queries/ngày = thêm ~$1,000/ngày |
+| Task **chưa được decompose rõ** | Nếu không biết agent nào làm gì, coordination overhead tạo ra hallucination cascade (agent sau tin agent trước không verify) | Failure mode: hallucinated citations trong researcher |
+
+**Tóm lại:** Không dùng multi-agent khi task đủ đơn giản để 1 LLM call giải quyết — thêm agent mà không có lý do rõ sẽ tốn cost, chậm hơn, và khó debug hơn.

@@ -41,16 +41,40 @@ def _parse_query(query: str) -> ResearchQuery:
 def baseline(
     query: Annotated[str, typer.Option("--query", "-q", help="Research query")],
 ) -> None:
-    """Run a minimal single-agent baseline placeholder."""
+    """Run a minimal single-agent baseline with a real LLM call."""
+
+    import time
+
+    from multi_agent_research_lab.services.llm_client import LLMClient
 
     _init()
     request = _parse_query(query)
-    state = ResearchState(request=request)
-    state.final_answer = (
-        "Baseline skeleton response. TODO(student): replace this with a real single-agent "
-        "implementation and record latency/cost/quality metrics."
+
+    system_prompt = (
+        "You are a research assistant. Given a research query, provide a concise, "
+        "well-structured answer with key findings and references where possible."
     )
+
+    client = LLMClient()
+
+    start = time.perf_counter()
+    response = client.complete(system_prompt=system_prompt, user_prompt=request.query)
+    latency = time.perf_counter() - start
+
+    state = ResearchState(request=request)
+    state.final_answer = response.content
+
+    # ── Display answer ──────────────────────────────────────────────
     console.print(Panel.fit(state.final_answer, title="Single-Agent Baseline"))
+
+    # ── Display metrics ─────────────────────────────────────────────
+    metrics_lines = [
+        f"Latency:       {latency:.2f}s",
+        f"Input tokens:  {response.input_tokens}",
+        f"Output tokens: {response.output_tokens}",
+        f"Est. cost:     ${response.cost_usd:.6f}" if response.cost_usd else "Est. cost:     N/A",
+    ]
+    console.print(Panel.fit("\n".join(metrics_lines), title="Baseline Metrics", style="cyan"))
 
 
 @app.command("multi-agent")
